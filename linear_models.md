@@ -237,3 +237,33 @@ manhattan_le_results_df %>%
 ```
 
 ![](linear_models_files/figure-gfm/unnamed-chunk-10-2.png)<!-- -->
+
+## Logistic regression
+
+``` r
+nyc_airbnb = 
+  nyc_airbnb %>% 
+    mutate(
+      expensive_apt = as.numeric(price > 500)
+    )
+```
+
+``` r
+logistic_fit = 
+  glm(
+    expensive_apt ~ stars + borough,
+    data = nyc_airbnb,
+    family = binomial())
+
+logistic_fit %>% 
+  broom::tidy()
+```
+
+    ## # A tibble: 5 × 5
+    ##   term             estimate std.error statistic    p.value
+    ##   <chr>               <dbl>     <dbl>     <dbl>      <dbl>
+    ## 1 (Intercept)       -21.0     182.      -0.116  0.908     
+    ## 2 stars               0.764     0.163    4.68   0.00000292
+    ## 3 boroughBrooklyn    12.4     182.       0.0684 0.945     
+    ## 4 boroughManhattan   13.6     182.       0.0749 0.940     
+    ## 5 boroughQueens      11.7     182.       0.0641 0.949
