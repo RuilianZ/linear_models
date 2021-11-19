@@ -1,0 +1,136 @@
+---
+title: "Cross Validation"
+author: "Ruilian Zhang"
+date: "11/18/2021"
+output: github_document
+---
+
+```{r}
+library(tidyverse)
+library(modelr)
+library(mgcv)
+
+theme_set(theme_minimal())
+```
+
+```{r}
+set.seed(1)
+
+nonlin_df = 
+  tibble(
+    id = 1:100,
+    x = runif(100, 0, 1),
+    y = 1 - 10 * (x - .3) ^ 2 + rnorm(100, 0, .3)
+  )
+
+nonlin_df %>% 
+  ggplot(aes(x = x, y = y)) + 
+  geom_point()
+```
+
+
+Create splits by hand, plot, fit models.
+
+```{r}
+train_df = sample_n(nonlin_df, 80)
+
+test_df = anti_join(nonlin_df, train_df, by = "id") # find the people in nonlin_df but not in train_df
+
+
+ggplot(train_df, aes(x = x, y = y)) +
+  geom_point() +
+  geom_point(data = test_df, color = "red")
+```
+
+```{r}
+linear_mod = lm(y ~x, data = train_df)
+smooth_mod = mgcv::gam(y ~ s(x), data = train_df)
+wiggly_mod = mgcv::gam(y ~ s(x, k = 30), sp = 10e-6, data = train_df)
+```
+
+```{r}
+train_df %>% 
+  add_predictions(smooth_mod) %>% 
+  ggplot(aes(x = x, y = y)) +
+  geom_point() +
+  geom_line(aes(y = pred), color = "red")
+```
+
+```{r}
+train_df %>% 
+  add_predictions(wiggly_mod) %>% 
+  ggplot(aes(x = x, y = y)) +
+  geom_point() +
+  geom_line(aes(y = pred), color = "red")
+```
+
+```{r}
+train_df %>% 
+  gather_predictions(linear_mod, smooth_mod, wiggly_mod) %>% 
+  mutate(model = fct_inorder(model)) %>% 
+  ggplot(aes(x = x, y = y)) + 
+  geom_point() + 
+  geom_line(aes(y = pred), color = "red") + 
+  facet_wrap(~model)
+```
+
+```{r}
+rmse(linear_mod, test_df)
+rmse(smooth_mod, test_df)
+rmse(wiggly_mod, test_df)
+```
+
+
+CV using modelr
+
+```{r}
+cv_df = crossv_mc(nonlin_df, 100) # not compatible with gam
+```
+
+```{r}
+cv_df %>% 
+  pull(train) %>% 
+  .[[1]] %>% 
+  as_tibble
+
+cv_df %>% 
+  pull(test) %>% 
+  .[[1]] %>% 
+  as_tibble
+
+cv_df = 
+  cv_df %>% 
+  mutate(
+    train = map(train, as_tibble),
+    test = map(test, as_tibble)
+  )
+```
+
+```{r}
+cv_df =
+  cv_df %>% 
+  mutate(
+    limear_mod = map(train, ~lm(y ~ x, data = .x)),
+    smooth_mod = map(train, ~mgcv::gam(y ~ s(x), data = .x)),
+    wiggly_mod = map(train, ~mgcv::gam(y ~ s(x, k = 30), sp = 10e-6, data = .x))
+  ) %>% 
+  mutate(
+    rmse_linear = map2_dbl(limear_mod, test, ~rmse(model = .x, data = .y)),
+    rmse_smooth = map2_dbl(smooth_mod, test, ~rmse(model = .x, data = .y)),
+    rmse_wiggly = map2_dbl(wiggly_mod, test, ~rmse(model = .x, data = .y))
+  )
+```
+
+```{r}
+cv_df %>% 
+  select(starts_with("rmse")) %>% 
+  pivot_longer(
+    everything(),
+    names_to = "model",
+    values_to = "rmse",
+    names_prefix = "rmse_") %>% 
+  mutate(model = fct_inorder(model)) %>% 
+  ggplot(aes(x = model, y = rmse)) +
+  geom_violin()
+```
+
