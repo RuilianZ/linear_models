@@ -1,0 +1,160 @@
+---
+title: "Bootstrapping"
+author: "Ruilian Zhang"
+date: "11/23/2021"
+output: github_document
+---
+
+```{r}
+library(tidyverse)
+library(p8105.datasets)
+library(modelr)
+
+set.seed(1)
+```
+
+
+
+```{r}
+n_samp = 250
+
+sim_df_const = 
+  tibble(
+    x = rnorm(n_samp, 1, 1),
+    error = rnorm(n_samp, 0, 1),
+    y = 2 + 3 * x + error
+  )
+
+sim_df_nonconst = sim_df_const %>% 
+  mutate(
+  error = error * .75 * x,
+  y = 2 + 3 * x + error
+)
+```
+
+```{r}
+sim_df_const %>% 
+  ggplot(aes(x = x, y = y)) +
+  geom_point()
+
+sim_df_nonconst %>% 
+  lm(y ~ x, data = .) %>% 
+  broom::tidy()
+```
+
+## Try biitstrap for inference
+
+```{r}
+bootstrap_sample = 
+  sim_df_nonconst %>% 
+  sample_frac(size = 1, replace = TRUE) %>% 
+  arrange(x)
+
+lm(y ~ x, data = bootstrap_sample)
+```
+
+Lets' write a function..
+
+```{r}
+boot_sample = function(df) {
+  
+  sample_frac(df, size = 1, replace = TRUE)
+  
+}
+```
+
+```{r}
+boot_trap_df = 
+  tibble(
+    strap_number = 1:1000,
+    strap_sample = rerun(1000, boot_sample(sim_df_nonconst))
+  )
+```
+
+
+
+```{r}
+boot_trap_df %>% 
+  mutate(
+    models = map(.x = strap_sample, ~ lm(y ~ x, data = .x)),
+    results = map(models, broom::tidy)
+  )
+```
+
+```{r}
+bootstrap_results = 
+  boot_trap_df %>% 
+  mutate(
+    models = map(.x = strap_sample, ~ lm(y ~ x, data = .x)),
+    results = map(models, broom::tidy)
+  ) %>% 
+  select(strap_number, results) %>% 
+  unnest(results)
+
+bootstrap_results %>% 
+  group_by(term) %>% 
+  summarize(
+    se = sd(estimate)
+  )
+```
+
+
+## Use modelr
+
+```{r}
+sim_df_nonconst %>% 
+  bootstrap(n = 1000, id = "strap_number") %>% 
+  mutate(
+    models = map(.x = strap, ~ lm(y~ x, data = .x)),
+    results = map(models, broom::tidy)
+  )
+```
+
+
+## Airbnb
+
+```{r}
+data("nyc_airbnb")
+
+nyc_air_bnb = 
+  nyc_airbnb %>% 
+  mutate(stars = review_scores_location  / 2) %>%
+  rename(
+    borough = neighbourhood_group
+  ) %>% 
+  filter(borough != "Staten Island") %>% 
+  select(price, stars, borough, room_type)
+```
+
+```{r}
+nyc_air_bnb %>% 
+  ggplot(aes(x = stars, y = price)) +
+  geom_point()
+```
+
+```{r}
+airbnb_results = 
+  nyc_air_bnb %>% 
+    filter(borough == "Manhattan") %>% 
+    bootstrap(n = 1000, id = "strap_number") %>% 
+    mutate(
+      models = map(strap, ~ lm(price ~ stars, data = .x)),
+      results = map(models, broom::tidy)
+    ) %>% 
+    select(strap_number, results) %>% 
+    unnest(results)
+
+ggp_star_density = 
+  airbnb_results %>% 
+  filter(term == "stars") %>% 
+  ggplot(aes(estimate)) +
+  geom_density()
+
+ggp_scatter = 
+  nyc_air_bnb %>% 
+  filter(borough == "Manhattan") %>% 
+  ggplot(aes(x = stars, y = price)) +
+  geom_point()
+  
+```
+
