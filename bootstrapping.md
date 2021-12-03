@@ -62,12 +62,12 @@ sim_df_nonconst %>%
     ## 1 (Intercept)     1.93    0.105       18.5 1.88e- 48
     ## 2 x               3.11    0.0747      41.7 5.76e-114
 
-## Try biitstrap for inference
+## Try bootstrap for inference
 
 ``` r
 bootstrap_sample = 
   sim_df_nonconst %>% 
-  sample_frac(size = 1, replace = TRUE) %>% 
+  sample_frac(size = 1, replace = TRUE) %>% # select random n percentage of rows from a dataframe
   arrange(x)
 
 lm(y ~ x, data = bootstrap_sample)
@@ -94,8 +94,8 @@ boot_sample = function(df) {
 ``` r
 boot_trap_df = 
   tibble(
-    strap_number = 1:1000,
-    strap_sample = rerun(1000, boot_sample(sim_df_nonconst))
+    strap_number = 1:100,
+    strap_sample = rerun(100, boot_sample(sim_df_nonconst))
   )
 ```
 
@@ -107,7 +107,7 @@ boot_trap_df %>%
   )
 ```
 
-    ## # A tibble: 1,000 × 4
+    ## # A tibble: 100 × 4
     ##    strap_number strap_sample       models results         
     ##           <int> <list>             <list> <list>          
     ##  1            1 <tibble [250 × 3]> <lm>   <tibble [2 × 5]>
@@ -120,7 +120,7 @@ boot_trap_df %>%
     ##  8            8 <tibble [250 × 3]> <lm>   <tibble [2 × 5]>
     ##  9            9 <tibble [250 × 3]> <lm>   <tibble [2 × 5]>
     ## 10           10 <tibble [250 × 3]> <lm>   <tibble [2 × 5]>
-    ## # … with 990 more rows
+    ## # … with 90 more rows
 
 ``` r
 bootstrap_results = 
@@ -142,8 +142,8 @@ bootstrap_results %>%
     ## # A tibble: 2 × 2
     ##   term            se
     ##   <chr>        <dbl>
-    ## 1 (Intercept) 0.0747
-    ## 2 x           0.101
+    ## 1 (Intercept) 0.0752
+    ## 2 x           0.102
 
 ## Use modelr
 
@@ -200,7 +200,7 @@ nyc_air_bnb %>%
 airbnb_results = 
   nyc_air_bnb %>% 
     filter(borough == "Manhattan") %>% 
-    bootstrap(n = 1000, id = "strap_number") %>% 
+    bootstrap(n = 100, id = "strap_number") %>% 
     mutate(
       models = map(strap, ~ lm(price ~ stars, data = .x)),
       results = map(models, broom::tidy)

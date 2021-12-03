@@ -42,12 +42,12 @@ sim_df_nonconst %>%
   broom::tidy()
 ```
 
-## Try biitstrap for inference
+## Try bootstrap for inference
 
 ```{r}
 bootstrap_sample = 
   sim_df_nonconst %>% 
-  sample_frac(size = 1, replace = TRUE) %>% 
+  sample_frac(size = 1, replace = TRUE) %>% # select random n percentage of rows from a dataframe
   arrange(x)
 
 lm(y ~ x, data = bootstrap_sample)
@@ -66,8 +66,8 @@ boot_sample = function(df) {
 ```{r}
 boot_trap_df = 
   tibble(
-    strap_number = 1:1000,
-    strap_sample = rerun(1000, boot_sample(sim_df_nonconst))
+    strap_number = 1:100,
+    strap_sample = rerun(100, boot_sample(sim_df_nonconst))
   )
 ```
 
@@ -136,7 +136,7 @@ nyc_air_bnb %>%
 airbnb_results = 
   nyc_air_bnb %>% 
     filter(borough == "Manhattan") %>% 
-    bootstrap(n = 1000, id = "strap_number") %>% 
+    bootstrap(n = 100, id = "strap_number") %>% 
     mutate(
       models = map(strap, ~ lm(price ~ stars, data = .x)),
       results = map(models, broom::tidy)
