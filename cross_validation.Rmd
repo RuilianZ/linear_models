@@ -75,7 +75,7 @@ train_df %>%
 ```
 
 ```{r}
-rmse(linear_mod, test_df)
+rmse(linear_mod, test_df) # root mean squared errors 
 rmse(smooth_mod, test_df)
 rmse(wiggly_mod, test_df)
 ```
